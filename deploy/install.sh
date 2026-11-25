@@ -217,7 +217,7 @@ do_run() {
   if [[ -n "$GIT_SSH_DIR" ]]; then
     [[ -f "$GIT_SSH_DIR/$GIT_SSH_KEY" ]] || die "git ssh key '$GIT_SSH_DIR/$GIT_SSH_KEY' not found (set GIT_SSH_DIR=\"\" to disable)"
     args+=(-v "$GIT_SSH_DIR:/codekb-home/.ssh-host:ro"
-      -e "GIT_SSH_COMMAND=ssh -F /dev/null -i /codekb-home/.ssh-host/$GIT_SSH_KEY -o UserKnownHostsFile=/codekb-home/.ssh-host/known_hosts -o StrictHostKeyChecking=accept-new")
+      -e "GIT_SSH_COMMAND=ssh -F /dev/null -i /codekb-home/.ssh-host/$GIT_SSH_KEY -o UserKnownHostsFile=/codekb-home/.ssh-host/known_hosts -o StrictHostKeyChecking=accept-new -o User=git")
   fi
   case "$CREDS_MODE" in
     profile) args+=(-v "$HOME/.aws:/codekb-home/.aws:ro" -e AWS_PROFILE="${AWS_PROFILE:-default}");;
