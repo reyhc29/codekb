@@ -34,7 +34,7 @@ Our copy then goes away by itself, or needs a small conflict fix.
 
 | Branch | What | Upstream PR |
 | --- | --- | --- |
-| `fix/refresh-v1-shared-stem` | refresh no longer fails with `invariant_violation` on old (V1 id) spaces where two files share a name | to open |
+| `fix/refresh-v1-shared-stem` | refresh no longer fails with `invariant_violation` on old (V1 id) spaces where two files share a name | [#48](https://github.com/awslabs/codekb/pull/48) |
 
 ## Run it
 
