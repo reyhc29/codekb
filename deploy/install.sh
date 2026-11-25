@@ -49,6 +49,7 @@ CODEKB_SUMMARIZATION_CONCURRENCY="40"
 CODEKB_BEDROCK_GUARDRAIL_ENABLED="false"
 CODEKB_LOG_LEVEL="WARNING"
 CODEKB_REQUIRE_AUTHENTICATION="false"
+CODEKB_REQUIRE_AUTHORIZATION="false"
 CODEKB_SECURITY_HEADERS_ENABLED="false"
 CODEKB_ALLOWED_GIT_HOSTS=""
 HOST_BIND="127.0.0.1"
@@ -163,6 +164,7 @@ CODEKB_LOG_LEVEL=${CODEKB_LOG_LEVEL}
 OTEL_LOGS_EXPORTER=none
 OTEL_SERVICE_NAME=codekb
 CODEKB_REQUIRE_AUTHENTICATION=${CODEKB_REQUIRE_AUTHENTICATION}
+CODEKB_REQUIRE_AUTHORIZATION=${CODEKB_REQUIRE_AUTHORIZATION}
 CODEKB_SECURITY_HEADERS_ENABLED=${CODEKB_SECURITY_HEADERS_ENABLED}
 CODEKB_BEDROCK_MODEL_ID=${CODEKB_BEDROCK_MODEL_ID}
 CODEKB_BEDROCK_REGION=${CODEKB_BEDROCK_REGION}
@@ -199,18 +201,26 @@ do_run() {
   log "removing any existing container '$CONTAINER_NAME'"
   "$CONTAINER_ENGINE" rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-  # The image runs as uid 10001 with HOME=/home/codekb. Run as the host user
-  # instead so it can read the host's ~/.aws and ssh key (both mode 600).
+  # The image runs as uid 10001 with HOME=/home/codekb (mode 700). Run as the host user
+  # so it can read the host ~/.aws and ssh key (mode 600), and use a neutral
+  # HOME, because the host uid cannot enter /home/codekb.
+  # ssh refuses to run for a uid with no passwd entry ("No user exists for
+  # uid"), so give the container the image's passwd plus one line for us.
+  local passwd_file="${ENV_FILE%/*}/.passwd-${CONTAINER_NAME}"
+  { "$CONTAINER_ENGINE" run --rm --entrypoint cat "$IMAGE" /etc/passwd
+    echo "codekb-host:x:$(id -u):$(id -g):codekb host user:/codekb-home:/sbin/nologin"
+  } > "$passwd_file" || die "could not write $passwd_file"
   local args=(-d --name "$CONTAINER_NAME" --restart "$RESTART_POLICY"
     -p "${HOST_BIND}:${HOST_PORT}:8000" --env-file "$ENV_FILE"
-    --user "$(id -u):$(id -g)" -e HOME=/home/codekb -e AWS_REGION="$AWS_REGION")
+    --user "$(id -u):$(id -g)" -v "$passwd_file:/etc/passwd:ro"
+    -e HOME=/codekb-home -e AWS_REGION="$AWS_REGION")
   if [[ -n "$GIT_SSH_DIR" ]]; then
     [[ -f "$GIT_SSH_DIR/$GIT_SSH_KEY" ]] || die "git ssh key '$GIT_SSH_DIR/$GIT_SSH_KEY' not found (set GIT_SSH_DIR=\"\" to disable)"
-    args+=(-v "$GIT_SSH_DIR:/home/codekb/.ssh-host:ro"
-      -e "GIT_SSH_COMMAND=ssh -F /dev/null -i /home/codekb/.ssh-host/$GIT_SSH_KEY -o UserKnownHostsFile=/home/codekb/.ssh-host/known_hosts -o StrictHostKeyChecking=accept-new")
+    args+=(-v "$GIT_SSH_DIR:/codekb-home/.ssh-host:ro"
+      -e "GIT_SSH_COMMAND=ssh -F /dev/null -i /codekb-home/.ssh-host/$GIT_SSH_KEY -o UserKnownHostsFile=/codekb-home/.ssh-host/known_hosts -o StrictHostKeyChecking=accept-new")
   fi
   case "$CREDS_MODE" in
-    profile) args+=(-v "$HOME/.aws:/home/codekb/.aws:ro" -e AWS_PROFILE="${AWS_PROFILE:-default}");;
+    profile) args+=(-v "$HOME/.aws:/codekb-home/.aws:ro" -e AWS_PROFILE="${AWS_PROFILE:-default}");;
     env)     eval "$(aws "${aws_args[@]}" configure export-credentials --format env)"
              args+=(-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN);;
     role)    ;;

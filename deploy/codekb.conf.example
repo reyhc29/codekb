@@ -28,6 +28,7 @@ CODEKB_BEDROCK_GUARDRAIL_ENABLED="false"  # true needs the guardrail made by inf
 # --- App behaviour ---
 CODEKB_LOG_LEVEL="WARNING"
 CODEKB_REQUIRE_AUTHENTICATION="false"    # localhost-only deploy; leave false
+CODEKB_REQUIRE_AUTHORIZATION="false"     # single user: every space is visible (old behaviour)
 CODEKB_SECURITY_HEADERS_ENABLED="false"  # false = dashboard can embed the UI in its iframe
 
 # --- Git host allowlist (space- or comma-separated hostnames, NOT URLs) ---
